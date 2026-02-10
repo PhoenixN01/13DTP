@@ -1,3 +1,12 @@
 .navbar-brand {
     margin-left: 1%;
 }
+
+.main-cd {
+    width: 95%;
+    margin: 3% auto;
+}
+
+.row {
+    justify-content: center;
+}
