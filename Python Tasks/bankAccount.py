@@ -20,5 +20,6 @@ class bankGUI:
         self.root.geometry("500x800+500+500")
 
     def create_frames(self):
-        self.input_frame = tk.Frame(self.root, width="")
+        self.input_frame = tk.Frame(self.root, width="300", height="50")
+        self.bankDetails_frame = tk.Frame(self.root, width="300", height="150")
         
