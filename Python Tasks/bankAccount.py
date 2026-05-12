@@ -1,17 +1,26 @@
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
+from datetime import datetime
 
 class bankAccount:
     def __init__(self, name):
         self.name = name
         self.balance = 0
+        self.transacLog = []
     
     def deposit(self, amount):
         self.balance += amount
+        self.updateLog(f"+ ${amount}", "deposit")
 
     def withdraw(self, amount):
         self.balance -= amount
+        self.updateLog(f"- ${amount}", "withdraw")
+
+    def updateLog(self, transacAmount, transacType):
+        logTime = datetime.now()
+        logTime = logTime.replace(microsecond=0)
+        self.transacLog.insert(0, [logTime, self.name, transacAmount, transacType])
 
 class bankGUI:
     def __init__(self, root):
@@ -20,6 +29,7 @@ class bankGUI:
         self.root.title("Big Bank")
         self.root.minsize(500, 800)
         self.root.geometry("500x800+500+0")
+        self.root.configure(bg="blanchedalmond")
 
         self.create_frames()
 
@@ -53,6 +63,40 @@ class bankGUI:
         ttk.Button(self.bankActions_frame, text="Deposit", command=lambda: self.funds_window("deposit")).grid(row=0, column=0)
         ttk.Button(self.bankActions_frame, text="Withdraw", command=lambda: self.funds_window("withdraw")).grid(row=0, column=1)
 
+        ttk.Label(self.bankLog_frame, text="Transaction History:").pack()
+
+        log_container = ttk.Frame(self.bankLog_frame)
+        log_container.pack(fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(log_container, orient="vertical")
+        scrollbar.pack(side="right", fill="y")
+
+        self.recentLog = ttk.Treeview(
+            log_container,
+            columns=("Date and Time", "Account Name", "Amount", "Type"),
+            show="headings",
+            yscrollcommand=scrollbar.set,
+            height=15
+        )
+
+        self.recentLog.tag_configure("deposit", foreground="green")
+        self.recentLog.tag_configure("withdraw", foreground="red")
+
+        scrollbar.config(command=self.recentLog.yview)
+
+        self.recentLog.heading("Date and Time", text="Date and Time")
+        self.recentLog.heading("Account Name", text="Account Name")
+        self.recentLog.heading("Amount", text="Amount")
+        self.recentLog.heading("Type", text="Type")
+
+        # Column sizes
+        self.recentLog.column("Date and Time", width=170)
+        self.recentLog.column("Account Name", width=100)
+        self.recentLog.column("Amount", width=80)
+        self.recentLog.column("Type", width=80)
+
+        self.recentLog.pack(side="left", fill="both", expand=True)
+
     def create_account(self):
         name = self.name_entry.get().strip()
 
@@ -61,7 +105,10 @@ class bankGUI:
             return
         
         if messagebox.askokcancel("Confirm Account", f"Are you sure you would like to create the bank account: {name}"):
+            messagebox.showinfo("Welcome!", f"Welcome to Big Bank {name}!")
             self.account = bankAccount(name)
+            self.name_label.config(text=f"Account: {name}")
+            self.balance_label.config(text=f"Balance: ${self.account.balance}")
         
         return
     
@@ -69,11 +116,11 @@ class bankGUI:
         try:
             return int(input)
         except ValueError or TypeError:
-            messagebox.showerror("Incorrect Input", f"{input} is invalid. \n \n Input must be an integer to continue")
+            messagebox.showerror("Incorrect Input", f"{input} is invalid. \n \nInput must be a positive integer to continue")
             return False
         
-    def process_funds(self, request):
-        if request is None or self.account is None:
+    def process_funds(self, request=""):
+        if request == "" or self.account is None:
             return
         value = self.change_amount.get().strip()
 
@@ -82,11 +129,18 @@ class bankGUI:
         if valid_change is False:
             return
 
+        if valid_change < 0:
+            messagebox.showerror("Invalid Input", f"{value} is invalid. \n \nInput must be a positive integer")
+            return
+        elif valid_change > 5000:
+            messagebox.showerror(f"Maximum {request.capitalize()}", f"{request.capitalize()}s can only be a maximum of $5000 per transaction")
+            return
+        
         if request == "withdraw":
             if valid_change > self.account.balance:
                 messagebox.showerror(
                     "Insufficient Funds",
-                    f"Maximum withdrawal is ${self.account.balance}"
+                    f"Please input a valid withdrawal amount. \n \nMaximum withdrawal is ${self.account.balance}"
                 )
                 return
 
@@ -95,14 +149,17 @@ class bankGUI:
         else:
             self.account.deposit(valid_change)
 
+        self.update_display()
+        self.update_recentLog()
         self.fundsWind.destroy()
 
-    def funds_window(self, request):
-        if request is None or self.account is None:
+    def funds_window(self, request=""):
+        if request == "" or self.account is None:
+            messagebox.showerror("No Account Found", "Please create an account to continue")
             return
         
         self.fundsWind = tk.Toplevel(self.root)
-        self.fundsWind.title(f"{request} Funds")
+        self.fundsWind.title(f"{request.capitalize()} Funds")
         funds_infoFrame = ttk.Frame(self.fundsWind, padding=10)
         funds_infoFrame.grid(row=0, column=0)
         funds_inputFrame = ttk.Frame(self.fundsWind, padding=10)
@@ -118,16 +175,46 @@ class bankGUI:
             funds_inputFrame,
             text="Confirm",
             command=lambda: self.process_funds(request)
-        ).grid(row=1, column=1)
+        ).grid(row=1, column=0)
                 
         return
     
     def update_display(self):
+        if self.account is None:
+            self.name_label.config(text="Account: -")
+            self.balance_label.config(text="Balance: -")
+        else:
+            self.balance_label.config(text=f"Balance: ${self.account.balance}")
         return
 
+    def update_recentLog(self):
+        if self.account is None or self.account.transacLog == []:
+            return
+
+        for item in self.recentLog.get_children():
+            self.recentLog.delete(item)
+
+        for log in self.account.transacLog[:10]:
+
+            trans_type = str(log[3])
+
+            self.recentLog.insert(
+                "",
+                "end",
+                values=(
+                    log[0],
+                    log[1],
+                    log[2],
+                    trans_type.capitalize()
+                ),
+                tags=(trans_type,)
+            )
+        
 root = tk.Tk()
+root.option_add('*background', 'blanchedalmond')
 style = ttk.Style()
+style.theme_use('clam')
+style.configure('.', background="antiquewhite1")
 style.configure("TFrame", background="blanchedalmond")
-style.configure("TLabel", background="blanchedalmond")
 gui = bankGUI(root)
 root.mainloop()
